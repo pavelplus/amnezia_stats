@@ -1,0 +1,7 @@
+.*
+!/.gitignore
+!.env.example
+*.sqlite3
+__pycache__
+/wireguard-stats
+/node_modules

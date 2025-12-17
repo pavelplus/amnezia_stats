@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* penguinui.com */
+@theme {
+    /* light theme */
+    --color-surface: var(--color-white);
+    --color-surface-alt: var(--color-slate-100);
+    --color-on-surface: var(--color-slate-700);
+    --color-on-surface-strong: var(--color-black);
+    --color-primary: var(--color-blue-700);
+    --color-on-primary: var(--color-slate-100);
+    --color-secondary: var(--color-indigo-700);
+    --color-on-secondary: var(--color-slate-100);
+    --color-outline: var(--color-slate-300);
+    --color-outline-strong: var(--color-slate-800);
+
+    /* dark theme */
+    --color-surface-dark: var(--color-slate-900);
+    --color-surface-dark-alt: var(--color-slate-800);
+    --color-on-surface-dark: var(--color-slate-300);
+    --color-on-surface-dark-strong: var(--color-white);
+    --color-primary-dark: var(--color-blue-600);
+    --color-on-primary-dark: var(--color-slate-100);
+    --color-secondary-dark: var(--color-indigo-600);
+    --color-on-secondary-dark: var(--color-slate-100);
+    --color-outline-dark: var(--color-slate-700);
+    --color-outline-dark-strong: var(--color-slate-300);
+
+    /* shared colors */
+    --color-info: var(--color-sky-600);
+    --color-on-info: var(--color-white);
+    --color-success: var(--color-green-600);
+    --color-on-success: var(--color-white);
+    --color-warning: var(--color-amber-500);
+    --color-on-warning: var(--color-white);
+    --color-danger: var(--color-red-600);
+    --color-on-danger: var(--color-white);
+
+    /* border radius */
+    --radius-radius: var(--radius-lg);
+}

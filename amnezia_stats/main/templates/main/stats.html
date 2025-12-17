@@ -1,0 +1,321 @@
+{% extends "main/base.html" %}
+
+{% block title %}AWG stats{% endblock title %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@imacrayon/alpine-ajax@0.12.6/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+{% endblock head_extra %}
+
+{% block body %}
+{% load main_extra_tags %}
+{% load tz %}
+
+<div class="container mx-auto text-center">
+
+    <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div>
+            <h2 class="text-xl">1 day stats</h2>
+            <div class="relative">
+                <canvas height="{{ chart_clients.height }}" id="chart_clients_1d" class="border rounded-radius border-outline dark:border-outline-dark"></canvas>
+            </div>
+        </div>
+        <div>
+            <h2 class="text-xl">7 days stats</h2>
+            <div class="relative">
+                <canvas height="{{ chart_clients.height }}" id="chart_clients_7d" class="border rounded-radius border-outline dark:border-outline-dark"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const chart_clients_1d = document.getElementById('chart_clients_1d');
+    
+        new Chart(chart_clients_1d, {
+            type: 'bar',
+            data: {
+            labels: {{ chart_clients.labels|safe }},
+            datasets: [
+                {
+                    label: 'rx',
+                    data: {{ chart_clients.rx_1d|safe }},
+                    borderWidth: 1
+                },
+                {
+                    label: 'tx',
+                    data: {{ chart_clients.tx_1d|safe }},
+                    borderWidth: 1
+                }
+            ]
+            },
+            options: {
+                indexAxis: 'y',
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    
+        const chart_clients_7d = document.getElementById('chart_clients_7d');
+    
+        new Chart(chart_clients_7d, {
+            type: 'bar',
+            data: {
+            labels: {{ chart_clients.labels|safe }},
+            datasets: [
+                {
+                    label: 'rx',
+                    data: {{ chart_clients.rx_7d|safe }},
+                    borderWidth: 1
+                },
+                {
+                    label: 'tx',
+                    data: {{ chart_clients.tx_7d|safe }},
+                    borderWidth: 1
+                }
+            ]
+            },
+            options: {
+                indexAxis: 'y',
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        var client_chart_1d_obj, client_chart_7d_obj
+
+        function destroyClientCharts() {
+            if (typeof client_chart_1d_obj !== 'undefined') client_chart_1d_obj.destroy();
+            if (typeof client_chart_7d_obj !== 'undefined') client_chart_7d_obj.destroy();
+        }
+    </script>
+
+    {% localtime off %}
+    <div id="lastStatsTable" class="overflow-hidden w-full mt-3 overflow-x-auto rounded-radius border border-outline dark:border-outline-dark">
+        <table class="w-full text-center text-sm text-on-surface dark:text-on-surface-dark">
+            <thead class="border-b border-outline bg-surface-alt text-sm text-on-surface-strong dark:border-outline-dark dark:bg-surface-dark-alt dark:text-on-surface-dark-strong">
+                <tr>
+                    <th scope="col" class="p-2">Client</th>
+                    <th scope="col" class="p-2">Endpoint</th>
+                    <th scope="col" class="p-2">Last seen UTC</th>
+                    <th scope="col" class="p-2">1 day: rx</th>
+                    <th scope="col" class="p-2">1 day: tx</th>
+                    <th scope="col" class="p-2">7 days: rx</th>
+                    <th scope="col" class="p-2">7 days: tx</th>
+                    <th scope="col" class="p-2">Total rx</th>
+                    <th scope="col" class="p-2">Total tx</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-outline dark:divide-outline-dark">
+                {% for stat in last_stats %}
+                    <tr class="{% if stat.client == client %}bg-info/30 dark:bg-info/30{% endif %}">
+                        <td class="p-2">
+                            <a
+                                x-target="clientStats lastStatsTable"
+                                @ajax:before="destroyClientCharts();"
+                                href="{% url 'main:stats' %}{% querystring client_id=stat.client.client_id %}"
+                                class="hover:underline">{{ stat.client.client_name }}
+                            </a>
+                        </td>
+                        <td class="p-2">
+                            {{ stat.endpoint }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.latest_handshake|date:"Y-m-d H:i"|default:"---" }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_rx_1d|bytes_to_hrs }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_tx_1d|bytes_to_hrs }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_rx_7d|bytes_to_hrs }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_tx_7d|bytes_to_hrs }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_rx|bytes_to_hrs }}
+                        </td>
+                        <td class="p-2">
+                            {{ stat.transfer_tx|bytes_to_hrs }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div> <!-- lastStatsTable -->
+    {% endlocaltime %}
+
+    <div id="clientStats">
+    {% if client %}
+        <h1 class="mt-6 p-1 sticky top-0 z-10 backdrop-blur-md text-2xl border rounded-radius border-info bg-info/50 text-on-info">{{ client.client_name }}</h1>
+
+        <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div>
+                <h2 class="text-xl">1 day stats</h2>
+                <div class="relative">
+                    <canvas height="300px" id="client_chart_1d" class="border rounded-radius border-outline dark:border-outline-dark"></canvas>
+                </div>
+            </div>
+            <div>
+                <h2 class="text-xl">7 days stats</h2>
+                <div class="relative">
+                    <canvas height="300px" id="client_chart_7d" class="border rounded-radius border-outline dark:border-outline-dark"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            var client_chart_1d = document.getElementById('client_chart_1d');
+
+            var client_chart_1d_obj = new Chart(client_chart_1d, {
+                type: 'bar',
+                data: {
+                labels: {{ client_chart_1d.labels|safe }},
+                datasets: [
+                    {
+                        label: 'rx',
+                        data: {{ client_chart_1d.rx|safe }},
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'tx',
+                        data: {{ client_chart_1d.tx|safe }},
+                        borderWidth: 1
+                    }
+                ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            var client_chart_7d = document.getElementById('client_chart_7d');
+
+            var client_chart_7d_obj = new Chart(client_chart_7d, {
+                type: 'bar',
+                data: {
+                labels: {{ client_chart_7d.labels|safe }},
+                datasets: [
+                    {
+                        label: 'rx',
+                        data: {{ client_chart_7d.rx|safe }},
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'tx',
+                        data: {{ client_chart_7d.tx|safe }},
+                        borderWidth: 1
+                    }
+                ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
+
+
+        <div class="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <div>
+                <h2 class="text-xl">1 day stats</h2>
+                <div class="overflow-hidden w-full overflow-x-auto rounded-radius border border-outline dark:border-outline-dark">
+                    {% localtime off %}
+                    <table class="w-full text-center text-sm text-on-surface dark:text-on-surface-dark">
+                        <thead class="border-b border-outline bg-surface-alt text-sm text-on-surface-strong dark:border-outline-dark dark:bg-surface-dark-alt dark:text-on-surface-dark-strong">
+                            <tr>
+                                <th scope="col" class="p-2">Datetime UTC</th>
+                                <th scope="col" class="p-2">Endpoint</th>
+                                <th scope="col" class="p-2">rx</th>
+                                <th scope="col" class="p-2">tx</th>
+                                <th scope="col" class="p-2">rx avg</th>
+                                <th scope="col" class="p-2">tx avg</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-outline dark:divide-outline-dark">
+                            {% for stat in client_stats_1d %}
+                                <tr>
+                                    <td class="p-2">
+                                        {{ stat.stat_time|date:"Y-m-d H:i" }}
+                                    </td>
+                                    <td class="p-2">
+                                        {{ stat.endpoint }}
+                                    </td>
+                                    <td class="p-2">
+                                    {{ stat.transfer_rx_delta|bytes_to_hrs }}
+                                    </td>
+                                    <td class="p-2">
+                                        {{ stat.transfer_tx_delta|bytes_to_hrs }}
+                                    </td>
+                                    <td class="p-2 text-outline dark:text-outline-dark">
+                                        {{ stat.transfer_rx_delta|bytes_avg:stat.seconds_delta|bytes_to_hrs }}ps
+                                    </td>
+                                    <td class="p-2 text-outline dark:text-outline-dark">
+                                        {{ stat.transfer_tx_delta|bytes_avg:stat.seconds_delta|bytes_to_hrs }}ps
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endlocaltime %}
+                </div>
+            </div>
+            <div>
+                <h2 class="text-xl">7 days stats</h2>
+                <div class="overflow-hidden w-full overflow-x-auto rounded-radius border border-outline dark:border-outline-dark">
+                    <table class="w-full text-center text-sm text-on-surface dark:text-on-surface-dark">
+                        <thead class="border-b border-outline bg-surface-alt text-sm text-on-surface-strong dark:border-outline-dark dark:bg-surface-dark-alt dark:text-on-surface-dark-strong">
+                            <tr>
+                                <th scope="col" class="p-2">Date</th>
+                                <th scope="col" class="p-2">rx</th>
+                                <th scope="col" class="p-2">tx</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-outline dark:divide-outline-dark">
+                            {% for stat in client_stats_7d %}
+                                <tr>
+                                    <td class="p-2">
+                                        {{ stat.stat_date|date:"Y-m-d" }}
+                                    </td>
+                                    <td class="p-2">
+                                        {{ stat.transfer_rx_delta|bytes_to_hrs }}
+                                    </td>
+                                    <td class="p-2">
+                                        {{ stat.transfer_tx_delta|bytes_to_hrs }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    </div> <!-- clientStats -->
+
+    <footer class="my-3 flex items-center justify-center rounded-radius bg-surface-alt dark:bg-surface-dark-alt">
+        <div class="p-5 text-outline dark:text-outline-dark">WG stats dashboard by DarkNRG 2025</div>
+    </footer>
+
+</div> <!-- container -->
+{% endblock body %}

@@ -1,0 +1,35 @@
+{% extends "main/base.html" %}
+
+{% block title %}Login{% endblock title %}
+
+{% block body %}
+    {% load main_extra_tags %}
+
+    <div class="w-full h-svh flex justify-center items-center">
+        <form method="post" class="w-sm flex flex-col">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="flex flex-col">
+                    <label for="{{ field.id_for_label }}" class="my-2">
+                        {{ field.label }}
+                        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                    </label>
+                    
+                    {{ field|add_class:"p-2 bg-surface dark:bg-surface-dark text-on-surface text-on-surface-dark border border-outline dark:border-outline-dark" }}
+                    
+                    {% if field.help_text %}
+                        <div><small class="form-text text-muted">{{ field.help_text }}</small></div>
+                    {% endif %}
+                    
+                    {% if field.errors %}
+                        <div class="bg-warning text-on-warning">
+                            {{ field.errors|striptags }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <input type="hidden" name="next" value="{{ next }}" />
+            <button type="submit" value="login" class="mt-5 p-2 bg-primary dark:bg-primary-dark">Войти</button>
+        </form>
+    </div>
+{% endblock body %}

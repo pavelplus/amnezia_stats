@@ -11,9 +11,30 @@ Running `amnezia-awg` docker container deployed by official Amnezia client on de
 Clone app:
 
 ``` shell
-mkdir /apps/amnezia_stats
+mkdir /apps
 cd /apps
 git clone https://github.com/pavelplus/amnezia_stats.git
+```
+
+Setup `.env` variables:
+
+``` shell
+cd /apps/amnezia_stats
+cp .env.example .env
+nano .env
+```
+
+`.env` example:
+
+``` ini
+DEBUG=False
+SECRET_KEY=<generate django secret key>
+ALLOWED_HOSTS=awg.domain.com,ip.add.re.ss
+STATIC_ROOT=/apps/amnezia_stats/static
+STATS_DIR=/var/log/wireguard-stats
+TIME_ZONE=Europe/Moscow
+SERVER_TIME_ZONE_OFFSET=0
+AMNEZIA_MAIN_CLIENT_TIME_ZONE_OFFSET=3
 ```
 
 Boot up venv, install modules and start django-app:
@@ -110,6 +131,11 @@ nginx -s reload  # как варинат вместо systemctl
 ```
 
 ## Cron job for stats processing
+
+Create log dirs:
+``` bash
+mkdir /var/log/wireguard-stats/processed
+```
 
 Script for stats dump and processing
 

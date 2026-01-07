@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import OuterRef, Subquery, Sum
-from django.db.models.functions import TruncDate
-from django.shortcuts import get_object_or_404
+from django.db.models import OuterRef, Subquery, Sum, Value
+from django.db.models.functions import TruncDate, Coalesce
+from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 
-from .stats import process_wg_stats_files
-from .models import WgClient, WgStatsRecord
 from config.settings import SERVER_TIME_ZONE_OFFSET
+from .models import WgClient, WgStatsRecord
+from .stats import process_wg_stats_files
 
 SERVER_TZ = timezone(timedelta(hours=SERVER_TIME_ZONE_OFFSET))
 
@@ -18,11 +18,12 @@ def index(request):
     context = {}
     
     return TemplateResponse(request, "main/index.html", context)
-
+    
 
 @login_required
 def stats(request):
-    process_wg_stats_files()
+    
+    # process_wg_stats_files()
     
     time_now = datetime.now(tz=SERVER_TZ)
     time_1d = time_now - timedelta(hours=24)
@@ -35,13 +36,15 @@ def stats(request):
     
     last_stats = WgStatsRecord.objects.filter(id__in=Subquery(last_stat_ids)).select_related('client').order_by('client__creation_date')
     last_stats = last_stats.annotate(
-        transfer_rx_1d=Subquery(totals_1d.annotate(transfer_rx_1d=Sum('transfer_rx_delta')).values('transfer_rx_1d')),
-        transfer_tx_1d=Subquery(totals_1d.annotate(transfer_tx_1d=Sum('transfer_tx_delta')).values('transfer_tx_1d')),
-        seconds_1d=Subquery(totals_1d.annotate(seconds_1d=Sum('seconds_delta')).values('seconds_1d')),
-        transfer_rx_7d=Subquery(totals_7d.annotate(transfer_rx_7d=Sum('transfer_rx_delta')).values('transfer_rx_7d')),
-        transfer_tx_7d=Subquery(totals_7d.annotate(transfer_tx_7d=Sum('transfer_tx_delta')).values('transfer_tx_7d')),
-        seconds_7d=Subquery(totals_7d.annotate(seconds_7d=Sum('seconds_delta')).values('seconds_7d')),
+        transfer_rx_1d=Coalesce(Subquery(totals_1d.annotate(transfer_rx_1d=Sum('transfer_rx_delta')).values('transfer_rx_1d')), 0),
+        transfer_tx_1d=Coalesce(Subquery(totals_1d.annotate(transfer_tx_1d=Sum('transfer_tx_delta')).values('transfer_tx_1d')), 0),
+        seconds_1d=Coalesce(Subquery(totals_1d.annotate(seconds_1d=Sum('seconds_delta')).values('seconds_1d')), 0),
+        transfer_rx_7d=Coalesce(Subquery(totals_7d.annotate(transfer_rx_7d=Sum('transfer_rx_delta')).values('transfer_rx_7d')), 0),
+        transfer_tx_7d=Coalesce(Subquery(totals_7d.annotate(transfer_tx_7d=Sum('transfer_tx_delta')).values('transfer_tx_7d')), 0),
+        seconds_7d=Coalesce(Subquery(totals_7d.annotate(seconds_7d=Sum('seconds_delta')).values('seconds_7d')), 0),
     )
+    
+    # print(last_stats.query)
     
     chart_clients = {}
     
@@ -53,10 +56,10 @@ def stats(request):
     
     for ls in last_stats:
         labels.append(ls.client.client_name)
-        rx_1d.append(round(ls.transfer_rx_1d/1000/1000))
-        tx_1d.append(round(ls.transfer_tx_1d/1000/1000))
-        rx_7d.append(round(ls.transfer_rx_7d/1000/1000))
-        tx_7d.append(round(ls.transfer_tx_7d/1000/1000))
+        rx_1d.append(round(ls.transfer_rx_1d/1000/1000) if ls.transfer_rx_1d else 0)
+        tx_1d.append(round(ls.transfer_tx_1d/1000/1000) if ls.transfer_tx_1d else 0)
+        rx_7d.append(round(ls.transfer_rx_7d/1000/1000) if ls.transfer_rx_7d else 0)
+        tx_7d.append(round(ls.transfer_tx_7d/1000/1000) if ls.transfer_tx_7d else 0)
     
     chart_clients = {
         'labels': labels,

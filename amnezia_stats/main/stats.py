@@ -23,6 +23,10 @@ def get_files_list(dirpath, pattern = None) -> list[str]:
     return filenames
 
 
+def get_stats_files_list() -> list[str]:
+    return get_files_list(STATS_DIR, 'wg-stats-*.txt')
+
+
 def read_file_content(dirpath, filename) -> str | None:
     filepath = os.path.join(dirpath, filename)
     try:
@@ -79,7 +83,7 @@ def process_wg_clients():
 def process_wg_stats_files():
     DUMP_KEYS = ['public_key', 'preshared_key', 'endpoint', 'allowed_ips', 'latest_handshake_timestamp', 'transfer_rx', 'transfer_tx', 'persistent-keepalive']
     
-    filenames = get_files_list(STATS_DIR, 'wg-stats-*.txt')
+    filenames = get_stats_files_list()
     
     if not filenames:
         return 0

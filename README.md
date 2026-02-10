@@ -19,7 +19,7 @@ git clone https://github.com/pavelplus/amnezia_stats.git
 Setup `.env` variables:
 
 ``` shell
-cd /apps/amnezia_stats
+cd /apps/amnezia_stats/amnezia_stats
 cp .env.example .env
 nano .env
 ```

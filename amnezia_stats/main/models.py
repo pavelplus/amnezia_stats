@@ -25,7 +25,7 @@ class WgClient(models.Model):
 # h8GoAFxVOhx6ydeHyg1ZwSLQyXd5rSzkOtPwPGWxAmM=	Pxpa7pmimoAHxb1Ex5eD0iLr6Vynv2VaN0x02JMF9tU=	31.28.246.107:39426	10.8.1.3/32	    1765483039	                   213536	       408992	       off   
 class WgStatsRecord(models.Model):
     client = models.ForeignKey(WgClient, on_delete=models.CASCADE)
-    stat_time = models.DateTimeField()
+    stat_time = models.DateTimeField(db_index=True)
     
     preshared_key = models.CharField(max_length=44)
     endpoint = models.CharField()
@@ -40,6 +40,11 @@ class WgStatsRecord(models.Model):
     transfer_tx_delta = models.BigIntegerField(default=0)
     transfer_rx_avg = models.IntegerField(default=0) # Bps
     transfer_tx_avg = models.IntegerField(default=0) # Bps
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['client', '-stat_time']),
+        ]
     
     def __str__(self):
         return f'{self.client} - { self.stat_time.strftime('%Y-%m-%d %H:%M:%S') }'

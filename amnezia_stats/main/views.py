@@ -34,7 +34,7 @@ def stats(request):
     totals_1d = WgStatsRecord.objects.filter(client=OuterRef('client'), stat_time__lte=time_now, stat_time__gte=time_1d).values('client')
     totals_7d = WgStatsRecord.objects.filter(client=OuterRef('client'), stat_time__lte=time_now, stat_time__gte=time_7d).values('client')
     
-    last_stats = WgStatsRecord.objects.filter(id__in=Subquery(last_stat_ids)).select_related('client').order_by('client__creation_date')
+    last_stats = WgStatsRecord.objects.filter(id__in=Subquery(last_stat_ids)).select_related('client').order_by('client__client_name')
     last_stats = last_stats.annotate(
         transfer_rx_1d=Coalesce(Subquery(totals_1d.annotate(transfer_rx_1d=Sum('transfer_rx_delta')).values('transfer_rx_1d')), 0),
         transfer_tx_1d=Coalesce(Subquery(totals_1d.annotate(transfer_tx_1d=Sum('transfer_tx_delta')).values('transfer_tx_1d')), 0),

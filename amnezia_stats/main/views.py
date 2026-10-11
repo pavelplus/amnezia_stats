@@ -6,7 +6,7 @@ from django.db.models.functions import TruncDate, Coalesce
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 
-from config.settings import SERVER_TIME_ZONE_OFFSET
+from config.settings import AMNEZIA_CONTAINERS, AMNEZIA_DEFAULT_CONTAINER, SERVER_TIME_ZONE_OFFSET
 from .models import WgClient, WgStatsRecord
 from .stats import process_wg_stats_files
 
@@ -25,11 +25,20 @@ def stats(request):
     
     # process_wg_stats_files()
     
+    # Selected container: ?container=<name>, defaults to the first configured one
+    containers = AMNEZIA_CONTAINERS
+    current_container = request.GET.get('container') or AMNEZIA_DEFAULT_CONTAINER
+    if current_container not in containers:
+        current_container = AMNEZIA_DEFAULT_CONTAINER
+    
     time_now = datetime.now(tz=SERVER_TZ)
     time_1d = time_now - timedelta(hours=24)
     time_7d = time_now - timedelta(days=7)
     
-    last_stat_ids = WgStatsRecord.objects.filter(client=OuterRef('client')).order_by('-stat_time').values('id')[:1]
+    last_stat_ids = WgStatsRecord.objects.filter(
+        client__container=current_container,
+        client=OuterRef('client')
+    ).order_by('-stat_time').values('id')[:1]
     
     totals_1d = WgStatsRecord.objects.filter(client=OuterRef('client'), stat_time__lte=time_now, stat_time__gte=time_1d).values('client')
     totals_7d = WgStatsRecord.objects.filter(client=OuterRef('client'), stat_time__lte=time_now, stat_time__gte=time_7d).values('client')
@@ -79,7 +88,7 @@ def stats(request):
     client_id = request.GET.get('client_id', 0)
     
     if client_id:
-        client = get_object_or_404(WgClient, pk=client_id)
+        client = get_object_or_404(WgClient, pk=client_id, container=current_container)
         client_stats_1d = WgStatsRecord.objects.filter(client=client, stat_time__gte=time_1d).order_by('-stat_time')
         client_stats_7d = WgStatsRecord.objects.filter(
             client=client,
@@ -130,6 +139,8 @@ def stats(request):
         'client_stats_7d': client_stats_7d,
         'client_chart_1d': client_chart_1d,
         'client_chart_7d': client_chart_7d,
+        'containers': containers,
+        'current_container': current_container,
     }
     
     return TemplateResponse(request, "main/stats.html", context)

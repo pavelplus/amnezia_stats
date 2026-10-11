@@ -32,10 +32,15 @@ SECRET_KEY=<generate django secret key>
 ALLOWED_HOSTS=awg.domain.com,ip.add.re.ss
 STATIC_ROOT=/apps/amnezia_stats/static
 STATS_DIR=/var/log/wireguard-stats
+# Comma-separated list of amnezia docker container names to collect stats from.
+# Dump files are stored in per-container subfolders: STATS_DIR/<container>/
+AMNEZIA_CONTAINERS=amnezia-awg
 TIME_ZONE=Europe/Moscow
 SERVER_TIME_ZONE_OFFSET=0
 AMNEZIA_MAIN_CLIENT_TIME_ZONE_OFFSET=3
 ```
+
+Multiple containers are supported: list their docker names comma-separated, e.g. `AMNEZIA_CONTAINERS=amnezia-awg,amnezia-awg-2`. Statistics for each container are shown separately and switchable by the container dropdown on the stats page.
 
 Boot up venv, install modules and start django-app:
 
@@ -134,31 +139,41 @@ nginx -s reload  # как варинат вместо systemctl
 
 Create log dirs:
 ``` bash
-mkdir /var/log/wireguard-stats/processed
+mkdir /var/log/wireguard-stats
 ```
 
-Script for stats dump and processing
+Script for stats dump and processing. It reads the container list from `.env` (`AMNEZIA_CONTAINERS`) and dumps stats for every container into its own subfolder:
 
 ``` bash
 #!/bin/bash
 
-# Create directory for logs if it doesn't exist
-mkdir -p /var/log/wireguard-stats
+# Load AMNEZIA_CONTAINERS from the app .env
+ENV_FILE="/apps/amnezia_stats/amnezia_stats/.env"
+AMNEZIA_CONTAINERS=$(grep -E '^AMNEZIA_CONTAINERS=' "$ENV_FILE" | cut -d'=' -f2- | tr -d ' ')
+AMNEZIA_CONTAINERS=${AMNEZIA_CONTAINERS:-amnezia-awg}
 
-# Generate filename with date and time
-FILENAME="/var/log/wireguard-stats/wg-stats-$(date +'%Y-%m-%d_%H-%M-%S').txt"
+STATS_DIR=$(grep -E '^STATS_DIR=' "$ENV_FILE" | cut -d'=' -f2- | tr -d ' ')
+STATS_DIR=${STATS_DIR:-/var/log/wireguard-stats}
 
-# Execute the command in the docker container and save output to file
-docker exec amnezia-awg wg show wg0 dump > "$FILENAME"
+# Create base directory for logs if it doesn't exist
+mkdir -p "$STATS_DIR"
 
-# Dump clients table
-docker exec amnezia-awg cat /opt/amnezia/awg/clientsTable > /var/log/wireguard-stats/clientsTable.txt
+# Dump stats from every configured container into its own subfolder
+for CONTAINER in ${AMNEZIA_CONTAINERS//,/ }; do
+    mkdir -p "$STATS_DIR/$CONTAINER/processed"
 
-# Execute processing python script
+    # Generate filename with date and time
+    FILENAME="$STATS_DIR/$CONTAINER/wg-stats-$(date +'%Y-%m-%d_%H-%M-%S').txt"
+
+    # Execute the command in the docker container and save output to file
+    docker exec "$CONTAINER" wg show wg0 dump > "$FILENAME"
+
+    # Dump clients table
+    docker exec "$CONTAINER" cat /opt/amnezia/awg/clientsTable > "$STATS_DIR/$CONTAINER/clientsTable.txt"
+done
+
+# Execute processing python script (processes all configured containers)
 /apps/amnezia_stats/.venv/bin/python3 /apps/amnezia_stats/amnezia_stats/manage.py process_stats_files
-
-# Optional: Add timestamp to the beginning of the file
-# echo "# Generated at: $(date)" | cat - "$FILENAME" > /tmp/wg-tmp && mv /tmp/wg-tmp "$FILENAME"
 ```
 
 Save this script to `/usr/local/bin/wg-stats-hourly.sh` and make it executable:
@@ -189,3 +204,28 @@ Add this line to run the script every hour:
 
 Go to http://your-ip-or-domain/stats
 Django admin: http://your-ip-or-domain/admin
+
+## Upgrading from single-container setup
+
+If you are upgrading an existing installation:
+
+1. Add containers list to `.env` (the first container is used for all existing data):
+
+``` ini
+AMNEZIA_CONTAINERS=amnezia-awg
+```
+
+2. Apply the migration (it tags all existing clients with the first container):
+
+``` shell
+python3 manage.py migrate
+```
+
+3. Move existing dump files into the first container's subfolder:
+
+``` bash
+cd /var/log/wireguard-stats
+mv wg-stats-*.txt clientsTable.txt amnezia-awg/
+```
+
+> Note: files left directly in `STATS_DIR` root (old layout) are still processed and tagged with the first configured container, so this step is optional.

@@ -27,6 +27,13 @@ environ.Env.read_env(BASE_DIR / '.env')
 # Stats dir
 STATS_DIR = env('STATS_DIR', default = PROJECT_ROOT / 'wireguard-stats')
 
+# Amnezia containers to collect stats from.
+# Stats are dumped to per-container subfolders: STATS_DIR/<container>/
+AMNEZIA_CONTAINERS = [c.strip() for c in env.list('AMNEZIA_CONTAINERS', default=['amnezia-awg']) if c.strip()]
+
+# Container used as default/fallback (first one in the list)
+AMNEZIA_DEFAULT_CONTAINER = AMNEZIA_CONTAINERS[0] if AMNEZIA_CONTAINERS else 'amnezia-awg'
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/

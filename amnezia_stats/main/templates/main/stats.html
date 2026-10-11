@@ -14,6 +14,34 @@
 
 <div class="container mx-auto text-center">
 
+    <!-- Global container switcher -->
+    <div class="mt-3 inline-flex items-center gap-2">
+        <label for="containerSelect" class="text-sm font-medium text-on-surface-strong dark:text-on-surface-dark-strong">Container:</label>
+        <select
+            id="containerSelect"
+            class="p-2 text-sm rounded-radius border border-outline bg-surface-alt text-on-surface-strong dark:border-outline-dark dark:bg-surface-dark-alt dark:text-on-surface-dark-strong"
+        >
+            {% for container in containers %}
+                <option value="{{ container }}" {% if container == current_container %}selected{% endif %}>{{ container }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <script>
+        var containerSelect = document.getElementById('containerSelect');
+        var clientContainer = '{{ client.container|default:"" }}';
+
+        containerSelect.addEventListener('change', function () {
+            var params = new URLSearchParams(window.location.search);
+            params.set('container', containerSelect.value);
+            // Keep the selected client only if it belongs to the selected container
+            if (!clientContainer || clientContainer !== containerSelect.value) {
+                params.delete('client_id');
+            }
+            window.location.href = window.location.pathname + '?' + params.toString();
+        });
+    </script>
+
     <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div>
             <h2 class="text-xl">1 day stats</h2>

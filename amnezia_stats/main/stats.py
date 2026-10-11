@@ -3,7 +3,13 @@ from datetime import datetime, timezone, timedelta
 
 from django.db import transaction
 
-from config.settings import STATS_DIR, SERVER_TIME_ZONE_OFFSET, AMNEZIA_MAIN_CLIENT_TIME_ZONE_OFFSET
+from config.settings import (
+    STATS_DIR,
+    SERVER_TIME_ZONE_OFFSET,
+    AMNEZIA_MAIN_CLIENT_TIME_ZONE_OFFSET,
+    AMNEZIA_CONTAINERS,
+    AMNEZIA_DEFAULT_CONTAINER,
+)
 from .models import WgClient, WgStatsRecord
 
 
@@ -23,8 +29,12 @@ def get_files_list(dirpath, pattern = None) -> list[str]:
     return filenames
 
 
-def get_stats_files_list() -> list[str]:
-    return get_files_list(STATS_DIR, 'wg-stats-*.txt')
+def get_container_dir(container) -> str:
+    return os.path.join(STATS_DIR, container)
+
+
+def get_stats_files_list(dirpath = STATS_DIR) -> list[str]:
+    return get_files_list(dirpath, 'wg-stats-*.txt')
 
 
 def read_file_content(dirpath, filename) -> str | None:
@@ -47,19 +57,20 @@ def read_file_content(dirpath, filename) -> str | None:
         return None
 
 
-def process_wg_clients():
-    """Update clients in DB"""
+def process_wg_clients(container: str):
+    """Update clients in DB for the given container"""
     
-    clients_file_content = read_file_content(STATS_DIR, 'clientsTable.txt')
+    clients_file_content = read_file_content(get_container_dir(container), 'clientsTable.txt')
     
     if not clients_file_content:
-        raise RuntimeError('Failed to retrieve clients list!')
+        print(f'Warning: clientsTable.txt not found for container "{container}", skipping clients update!')
+        return
     
     clients_list = json.loads(clients_file_content)
     
     with transaction.atomic():
         
-        WgClient.objects.update(is_deleted=True)
+        WgClient.objects.filter(container=container).update(is_deleted=True)
     
         for client_dict in clients_list:
             try:
@@ -69,6 +80,7 @@ def process_wg_clients():
                 client.client_id = client_dict['clientId']
 
             client.client_name = client_dict['userData']['clientName']
+            client.container = container
             
             # "Thu Dec 11 21:41:03 2025"
             # "%a %b %d %H:%M:%S %Y"
@@ -80,26 +92,44 @@ def process_wg_clients():
     
 
 
-def process_wg_stats_files():
+def process_wg_stats_files() -> int:
+    num_files = 0
+    
+    # Per-container subfolders: STATS_DIR/<container>/
+    for container in AMNEZIA_CONTAINERS:
+        num_files += process_container_stats_files(container, get_container_dir(container))
+    
+    # Backward compatibility: legacy flat files in STATS_DIR root
+    # are processed and tagged with the default (first) container
+    if STATS_DIR != get_container_dir(AMNEZIA_DEFAULT_CONTAINER):
+        num_files += process_container_stats_files(AMNEZIA_DEFAULT_CONTAINER, STATS_DIR)
+    
+    return num_files
+
+
+def process_container_stats_files(container: str, dirpath: str) -> int:
     DUMP_KEYS = ['public_key', 'preshared_key', 'endpoint', 'allowed_ips', 'latest_handshake_timestamp', 'transfer_rx', 'transfer_tx', 'persistent-keepalive']
     
-    filenames = get_stats_files_list()
+    filenames = get_stats_files_list(dirpath)
     
     if not filenames:
         return 0
     
-    process_wg_clients()
+    processed_dir = os.path.join(dirpath, 'processed')
+    os.makedirs(processed_dir, exist_ok=True)
+    
+    process_wg_clients(container)
     
     prev_stats = {}
     
     for f in filenames:
         
-        print(f'Processing file: {f}')
+        print(f'Processing file: {f} (container: {container})')
         
         filename_time = f.replace('wg-stats-', '').replace('.txt', '') # wg-stats-2025-12-11_19-57-53.txt
         stat_time = datetime.strptime(filename_time, '%Y-%m-%d_%H-%M-%S').replace(tzinfo=SERVER_TZ)
         
-        file_content = read_file_content(STATS_DIR, f)
+        file_content = read_file_content(dirpath, f)
         lines = file_content.splitlines()[1:]
         for line in lines:
             # <public_key> <preshared_key> <endpoint> <allowed_ips> <latest_handshake_timestamp> <transfer_rx> <transfer_tx> <persistent-keepalive>
@@ -111,7 +141,11 @@ def process_wg_stats_files():
                 client = WgClient()
                 client.client_id = stat_vals['public_key']
                 client.client_name = 'UNKNOWN'
-                client.save()
+            
+            if client.container != container:
+                client.container = container
+            
+            client.save()
             
             try:
                 stats_record = WgStatsRecord.objects.get(client=client, stat_time=stat_time)
@@ -150,6 +184,6 @@ def process_wg_stats_files():
             stats_record.save()
             prev_stats[client.client_id] = stats_record
             
-        os.rename(os.path.join(STATS_DIR, f), os.path.join(STATS_DIR, 'processed', f))
+        os.rename(os.path.join(dirpath, f), os.path.join(processed_dir, f))
             
     return len(filenames)

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+from config.settings import AMNEZIA_DEFAULT_CONTAINER
 from .utils import bytes_to_hrs
 
 
@@ -13,6 +14,7 @@ class User(AbstractUser):
 class WgClient(models.Model):
     client_id = models.CharField(max_length=44, primary_key=True)
     client_name = models.CharField()
+    container = models.CharField(max_length=64, db_index=True, default=AMNEZIA_DEFAULT_CONTAINER)
     creation_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     

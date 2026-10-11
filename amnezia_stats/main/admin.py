@@ -8,4 +8,6 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(WgClient)
 class WgClientAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('client_name', 'container', 'client_id', 'creation_date', 'is_deleted')
+    list_filter = ('container', 'is_deleted')
+    search_fields = ('client_name', 'client_id')

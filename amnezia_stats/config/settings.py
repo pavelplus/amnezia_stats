@@ -28,8 +28,20 @@ environ.Env.read_env(BASE_DIR / '.env')
 STATS_DIR = env('STATS_DIR', default = PROJECT_ROOT / 'wireguard-stats')
 
 # Amnezia containers to collect stats from.
+# Each entry may be "name" or "name:interface" (interface defaults to wg0).
 # Stats are dumped to per-container subfolders: STATS_DIR/<container>/
-AMNEZIA_CONTAINERS = [c.strip() for c in env.list('AMNEZIA_CONTAINERS', default=['amnezia-awg']) if c.strip()]
+AMNEZIA_CONTAINERS = []
+AMNEZIA_CONTAINER_INTERFACES = {}
+for _entry in env.list('AMNEZIA_CONTAINERS', default=['amnezia-awg']):
+    _entry = _entry.strip()
+    if not _entry:
+        continue
+    _parts = _entry.split(':')
+    _name = _parts[0].strip()
+    _interface = _parts[1].strip() if len(_parts) > 1 and _parts[1].strip() else 'wg0'
+    if _name and _name not in AMNEZIA_CONTAINERS:
+        AMNEZIA_CONTAINERS.append(_name)
+        AMNEZIA_CONTAINER_INTERFACES[_name] = _interface
 
 # Container used as default/fallback (first one in the list)
 AMNEZIA_DEFAULT_CONTAINER = AMNEZIA_CONTAINERS[0] if AMNEZIA_CONTAINERS else 'amnezia-awg'

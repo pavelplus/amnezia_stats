@@ -33,14 +33,15 @@ ALLOWED_HOSTS=awg.domain.com,ip.add.re.ss
 STATIC_ROOT=/apps/amnezia_stats/static
 STATS_DIR=/var/log/wireguard-stats
 # Comma-separated list of amnezia docker container names to collect stats from.
+# Each entry may be "name" or "name:interface" (interface defaults to wg0).
 # Dump files are stored in per-container subfolders: STATS_DIR/<container>/
-AMNEZIA_CONTAINERS=amnezia-awg
+AMNEZIA_CONTAINERS=amnezia-awg:wg0
 TIME_ZONE=Europe/Moscow
 SERVER_TIME_ZONE_OFFSET=0
 AMNEZIA_MAIN_CLIENT_TIME_ZONE_OFFSET=3
 ```
 
-Multiple containers are supported: list their docker names comma-separated, e.g. `AMNEZIA_CONTAINERS=amnezia-awg,amnezia-awg-2`. Statistics for each container are shown separately and switchable by the container dropdown on the stats page.
+Multiple containers are supported: list their docker names comma-separated, e.g. `AMNEZIA_CONTAINERS=amnezia-awg:wg0,amnezia-awg-2:awg0`. The optional `:interface` suffix sets the wireguard interface name used by the `wg show` dump command inside that container (defaults to `wg0`). Statistics for each container are shown separately and switchable by the container dropdown on the stats page.
 
 Boot up venv, install modules and start django-app:
 
@@ -113,7 +114,7 @@ nano /etc/nginx/sites-available/amnezia_stats
 ``` nginx
 server {
     listen 80;
-    server_name csnl.bitpak.ru;
+    server_name <<INSERT SERVER URL OR IP>>;
 
     location = /favicon.ico { access_log off; log_not_found off; }
 
@@ -158,15 +159,22 @@ STATS_DIR=${STATS_DIR:-/var/log/wireguard-stats}
 # Create base directory for logs if it doesn't exist
 mkdir -p "$STATS_DIR"
 
-# Dump stats from every configured container into its own subfolder
-for CONTAINER in ${AMNEZIA_CONTAINERS//,/ }; do
+# Dump stats from every configured container into its own subfolder.
+# Each entry may be "name" or "name:interface" (interface defaults to wg0).
+for ENTRY in ${AMNEZIA_CONTAINERS//,/ }; do
+    CONTAINER="${ENTRY%%:*}"
+    INTERFACE="${ENTRY##*:}"
+    if [ "$INTERFACE" = "$CONTAINER" ]; then
+        INTERFACE="wg0"
+    fi
+
     mkdir -p "$STATS_DIR/$CONTAINER/processed"
 
     # Generate filename with date and time
     FILENAME="$STATS_DIR/$CONTAINER/wg-stats-$(date +'%Y-%m-%d_%H-%M-%S').txt"
 
     # Execute the command in the docker container and save output to file
-    docker exec "$CONTAINER" wg show wg0 dump > "$FILENAME"
+    docker exec "$CONTAINER" wg show "$INTERFACE" dump > "$FILENAME"
 
     # Dump clients table
     docker exec "$CONTAINER" cat /opt/amnezia/awg/clientsTable > "$STATS_DIR/$CONTAINER/clientsTable.txt"

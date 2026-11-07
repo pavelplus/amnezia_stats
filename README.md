@@ -208,6 +208,29 @@ Add this line to run the script every hour:
 # 5 * * * * /usr/local/bin/wg-stats-hourly.sh
 ```
 
+## History cleanup
+
+Statistics accumulate over time and can be cleaned up with the `clear_history` management command. It deletes `WgStatsRecord` elements older than the specified number of days, and then removes `WgClient` elements that have no stats records left.
+
+``` shell
+cd /apps/amnezia_stats
+source .venv/bin/activate
+cd amnezia_stats
+python3 manage.py clear_history 90
+```
+
+The command takes one required argument — the number of days:
+
+- `python3 manage.py clear_history 90` — deletes stats records older than 90 days, then deletes clients with no records left;
+- `python3 manage.py clear_history 0` — deletes all stats records and then all clients.
+
+To run the cleanup automatically, e.g. nightly at 03:00, add it to the crontab:
+
+``` bash
+# Clean up stats older than 90 days every night at 03:00
+0 3 * * * /apps/amnezia_stats/.venv/bin/python3 /apps/amnezia_stats/amnezia_stats/manage.py clear_history 90
+```
+
 ## Access panel
 
 Go to http://your-ip-or-domain/stats

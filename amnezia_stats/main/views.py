@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import OuterRef, Subquery, Sum, Value
-from django.db.models.functions import TruncDate, Coalesce
+from django.db.models.functions import TruncDate, TruncMonth, Coalesce
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 
@@ -34,6 +34,10 @@ def stats(request):
     time_now = datetime.now(tz=SERVER_TZ)
     time_1d = time_now - timedelta(hours=24)
     time_7d = time_now - timedelta(days=7)
+    # Last 12 months, the first shown month starts on the first day of its month
+    time_12m = time_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(11):
+        time_12m = (time_12m - timedelta(days=1)).replace(day=1)
     
     last_stat_ids = WgStatsRecord.objects.filter(
         client__container=current_container,
@@ -84,6 +88,7 @@ def stats(request):
     client_stats_7d = None
     client_chart_1d = {}
     client_chart_7d = {}
+    client_chart_12m = {}
     
     client_id = request.GET.get('client_id', 0)
     
@@ -100,6 +105,15 @@ def stats(request):
             transfer_tx_delta=Sum('transfer_tx_delta'),
             seconds_delta=Sum('seconds_delta')
         ).order_by('-stat_date')
+        client_stats_12m = WgStatsRecord.objects.filter(
+            client=client,
+            stat_time__gte=time_12m
+        ).annotate(
+            stat_month=TruncMonth('stat_time')
+        ).values('stat_month').annotate(
+            transfer_rx_delta=Sum('transfer_rx_delta'),
+            transfer_tx_delta=Sum('transfer_tx_delta'),
+        ).order_by('-stat_month')
         
         labels = []
         rx = []
@@ -130,6 +144,21 @@ def stats(request):
             'rx': rx[::-1],
             'tx': tx[::-1],
         }
+        
+        labels = []
+        rx = []
+        tx = []
+        
+        for cs in client_stats_12m:
+            labels.append(cs['stat_month'].strftime('%m.%Y'))
+            rx.append(round(cs['transfer_rx_delta']/1000/1000))
+            tx.append(round(cs['transfer_tx_delta']/1000/1000))
+        
+        client_chart_12m = {
+            'labels': labels[::-1],
+            'rx': rx[::-1],
+            'tx': tx[::-1],
+        }
             
     context = {
         'last_stats': last_stats,
@@ -139,6 +168,7 @@ def stats(request):
         'client_stats_7d': client_stats_7d,
         'client_chart_1d': client_chart_1d,
         'client_chart_7d': client_chart_7d,
+        'client_chart_12m': client_chart_12m,
         'containers': containers,
         'current_container': current_container,
     }

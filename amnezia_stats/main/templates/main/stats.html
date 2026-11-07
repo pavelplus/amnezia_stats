@@ -118,11 +118,12 @@
             }
         });
 
-        var client_chart_1d_obj, client_chart_7d_obj
+        var client_chart_1d_obj, client_chart_7d_obj, client_chart_12m_obj
 
         function destroyClientCharts() {
             if (typeof client_chart_1d_obj !== 'undefined') client_chart_1d_obj.destroy();
             if (typeof client_chart_7d_obj !== 'undefined') client_chart_7d_obj.destroy();
+            if (typeof client_chart_12m_obj !== 'undefined') client_chart_12m_obj.destroy();
         }
     </script>
 
@@ -261,6 +262,7 @@
                     }
                 }
             });
+
         </script>
 
 
@@ -318,26 +320,64 @@
                                 <th scope="col" class="p-2">rx</th>
                                 <th scope="col" class="p-2">tx</th>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-outline dark:divide-outline-dark">
-                            {% for stat in client_stats_7d %}
-                                <tr>
-                                    <td class="p-2">
-                                        {{ stat.stat_date|date:"Y-m-d" }}
-                                    </td>
-                                    <td class="p-2">
-                                        {{ stat.transfer_rx_delta|bytes_to_hrs }}
-                                    </td>
-                                    <td class="p-2">
-                                        {{ stat.transfer_tx_delta|bytes_to_hrs }}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody class="divide-y divide-outline dark:divide-outline-dark">
+                                {% for stat in client_stats_7d %}
+                                    <tr>
+                                        <td class="p-2">
+                                            {{ stat.stat_date|date:"Y-m-d" }}
+                                        </td>
+                                        <td class="p-2">
+                                            {{ stat.transfer_rx_delta|bytes_to_hrs }}
+                                        </td>
+                                        <td class="p-2">
+                                            {{ stat.transfer_tx_delta|bytes_to_hrs }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+    
+        <div class="mt-3">
+            <h2 class="text-xl">12 months stats</h2>
+            <div class="relative">
+                <canvas height="300px" id="client_chart_12m" class="border rounded-radius border-outline dark:border-outline-dark"></canvas>
+            </div>
         </div>
+
+        <script>
+            var client_chart_12m = document.getElementById('client_chart_12m');
+
+            var client_chart_12m_obj = new Chart(client_chart_12m, {
+                type: 'bar',
+                data: {
+                labels: {{ client_chart_12m.labels|safe }},
+                datasets: [
+                    {
+                        label: 'rx',
+                        data: {{ client_chart_12m.rx|safe }},
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'tx',
+                        data: {{ client_chart_12m.tx|safe }},
+                        borderWidth: 1
+                    }
+                ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
     {% endif %}
     </div> <!-- clientStats -->
 

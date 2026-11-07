@@ -50,7 +50,7 @@ cd /apps/amnezia_stats
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cd /apps/amnezia_stats/mnezia_stats
+cd /apps/amnezia_stats/amnezia_stats
 python3 manage.py makemigrations
 python3 manage.py migrate
 python3 manage.py createsuperuser
